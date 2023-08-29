@@ -1,0 +1,41 @@
+---
+title: "RA09"
+output: html_document
+date: "2023-08-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+install.packages("haven")
+install.packages("tidyverse")
+install.packages("gt")
+```
+```{r}
+library(haven)
+library(tidyverse)
+library(gt)
+```
+
+
+```{r}
+
+df_raw <- haven::read_dta("smallmo.dta")
+head(df_raw)
+glimpse(df_raw)
+```
+
+ここで表作る。
+```{r}
+View(df_raw)
+```
+```{r}
+
+df_raw |>
+  mutate(area)
+df_rwa1 <- df_raw |> 
+  select(area,north,centre,south)
+```
+
