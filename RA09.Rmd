@@ -12,11 +12,16 @@ knitr::opts_chunk$set(echo = TRUE)
 install.packages("haven")
 install.packages("tidyverse")
 install.packages("gt")
+install.packages("gtsummary")
+install.packages("modelsummary")
+install.packages("estimatr")
 ```
 ```{r}
 library(haven)
 library(tidyverse)
 library(gt)
+library(estimatr)
+library(modelsummary)
 ```
 
 
@@ -24,10 +29,11 @@ library(gt)
 
 df_raw <- haven::read_dta("smallmo.dta")
 head(df_raw)
+names(df_raw)
 glimpse(df_raw)
 ```
 
-ここで表作る。
+#ここで表作る。
 ```{r}
 View(df_raw)
 ```
@@ -37,5 +43,69 @@ df_raw |>
   mutate(area)
 df_rwa1 <- df_raw |> 
   select(area,north,centre,south)
+```
+```{r}
+# table1
+# for(i in 0:1){
+#   df_raw |> 
+#     mutate(
+#       area2 = case_match(south,
+#         0 ~ "North/Center",
+#         1 ~ "South",
+#         .default = NA
+#       )
+#     ) |> 
+#     filter(grade == i) |> 
+#     select (area2, female, immigrants_broad, dad_midedu, mom_employed, answers_math_pct, answers_ital_pct,
+#             clsize_snv, our_CHEAT_math, our_CHEAT_ital) |>
+#   filter(!is.na(our_CHEAT_math) & !is.na(our_CHEAT_ital)) |> 
+#     tbl_summary(
+#       by = area2,
+#       statistic = list(all_continuous()~"{mean} ({sd})")
+#       ) |> 
+#     add_overall()}
+
+make_table <- function(i){
+  df_raw |> 
+    mutate(
+      area2 = case_match(south,
+        0 ~ "North/Center",
+        1 ~ "South",
+        .default = NA
+      )
+    ) |> 
+    filter(grade == i) |> 
+    select (area2, female, immigrants_broad, dad_midedu, mom_employed, answers_math_pct, answers_ital_pct,
+            clsize_snv, our_CHEAT_math, our_CHEAT_ital) |>
+  filter(!is.na(our_CHEAT_math) & !is.na(our_CHEAT_ital)) |> 
+    tbl_summary(
+      by = area2,
+      statistic = list(all_continuous()~"{mean} ({sd})")
+      ) |> 
+    add_overall()
+}
+```
+
+
+```{r}
+for (i in 0:1) {
+  eval(parse(text=paste("table_grade",i,"<- make_table(",i,")",sep="")))
+}
+
+# 表をつなげる
+tbl_merge(list(table_grade1, table_grade0),
+          tab_spanner = c("**Grade2**", "**Grade5**"))
+
+
+
+```
+
+# Table2
+```{r}
+ols1 <- lm_robust(answers_math_std ~ 
+                    clsize_snv + students + students2, #コントロール変数追加する
+                  data =df_raw,
+                  se_type = "stata")
+msummary(ols1)
 ```
 
