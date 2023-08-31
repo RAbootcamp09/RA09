@@ -39,10 +39,10 @@ View(df_raw)
 ```
 ```{r}
 
-df_raw |>
-  mutate(area)
-df_rwa1 <- df_raw |> 
-  select(area,north,centre,south)
+# df_raw |>
+#   mutate(area)
+# df_rwa1 <- df_raw |> 
+#  select(area,north,centre,south)
 ```
 ```{r}
 # table1
@@ -82,7 +82,7 @@ make_table <- function(i){
       by = area2,
       statistic = list(all_continuous()~"{mean} ({sd})")
       ) |> 
-    add_overall()
+    add_overall() #error
 }
 ```
 
@@ -107,5 +107,49 @@ ols1 <- lm_robust(answers_math_std ~
                   data =df_raw,
                   se_type = "stata")
 msummary(ols1)
+```
+
+```{r}
+
+
+ols <- function(data,outcome){
+  result <-
+  df_raw |> 
+    rename(y = outcome) |> 
+    mutate(clsize_new = clsize_snv/10) |> 
+    lm_robust(y ~ 
+                    clsize_new + students + 
+                    students2 + 
+                    m_female + female + immigrants_broad +
+                    dad_lowedu + dad_midedu + dad_highedu +
+                    mom_employed + mom_unemp + mom_housew +
+                    enrol_ins_snv + factor(region), 
+                  fixed_effects =~ factor(survey) + factor(grade) ,
+                  clusters = clu,
+                  data = _,
+                  se_type = "stata")
+  return(result)
+}
+```
+
+```{r}
+ols1 <- ols(df_raw,"answers_math_std")
+ols1
+```
+
+```{r}
+df_north_center <- df_raw |> filter(south==0)
+df_south <- df_raw |> filter(south==1)
+```
+
+```{r}
+ols2_1 <- ols (df_raw, "answers_math_std")
+ols2_2 <- ols (df_north_center, "answers_math_std")
+ols2_3 <- ols (df_south, "answers_math_std")
+```
+
+```{r}
+table2_ols <-  list(ols2_1, ols2_2, ols2_3)
+msummary(table2_ols)
 ```
 
