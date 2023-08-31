@@ -20,6 +20,7 @@ install.packages("estimatr")
 library(haven)
 library(tidyverse)
 library(gt)
+library(gtsummary)
 library(estimatr)
 library(modelsummary)
 ```
@@ -95,26 +96,14 @@ for (i in 0:1) {
 # 表をつなげる
 tbl_merge(list(table_grade1, table_grade0),
           tab_spanner = c("**Grade2**", "**Grade5**"))
-
-
-
 ```
 
-# Table2
-```{r}
-ols1 <- lm_robust(answers_math_std ~ 
-                    clsize_snv + students + students2, #コントロール変数追加する
-                  data =df_raw,
-                  se_type = "stata")
-msummary(ols1)
-```
+
 
 ```{r}
-
-
 ols <- function(data,outcome){
   result <-
-  df_raw |> 
+  data |> 
     rename(y = outcome) |> 
     mutate(clsize_new = clsize_snv/10) |> 
     lm_robust(y ~ 
@@ -132,24 +121,74 @@ ols <- function(data,outcome){
 }
 ```
 
-```{r}
-ols1 <- ols(df_raw,"answers_math_std")
-ols1
-```
-
+データ整形(North/Center か South)
 ```{r}
 df_north_center <- df_raw |> filter(south==0)
 df_south <- df_raw |> filter(south==1)
 ```
 
+#table2 PanelA (ols)
 ```{r}
-ols2_1 <- ols (df_raw, "answers_math_std")
-ols2_2 <- ols (df_north_center, "answers_math_std")
-ols2_3 <- ols (df_south, "answers_math_std")
+ols2A_1 <- ols (df_raw, "answers_math_std")
+ols2A_2 <- ols (df_north_center, "answers_math_std")
+ols2A_3 <- ols (df_south, "answers_math_std")
 ```
 
 ```{r}
-table2_ols <-  list(ols2_1, ols2_2, ols2_3)
-msummary(table2_ols)
+table2A_ols <-  list(ols2A_1, ols2A_2, ols2A_3)
+msummary(table2A_ols, 
+         coef_omit = -1,
+         coef_rename = c("clsize_new" = "Class size"),
+         gof_map = c("nobs"),
+         )
 ```
+
+#table2 PanelB (ols)
+```{r}
+ols2B_1 <- ols (df_raw, "answers_ital_std")
+ols2B_2 <- ols (df_north_center, "answers_ital_std")
+ols2B_3 <- ols (df_south, "answers_ital_std")
+```
+
+```{r}
+table2B_ols <-  list(ols2B_1, ols2B_2, ols2B_3)
+msummary(table2B_ols, 
+         coef_omit = -1,
+         coef_rename = c("clsize_new" = "Class size"),
+         gof_map = c("nobs"),
+         )
+```
+
+#table3 PanelA (ols)
+```{r}
+ols3A_1 <- ols (df_raw, "our_CHEAT_math")
+ols3A_2 <- ols (df_north_center, "our_CHEAT_math")
+ols3A_3 <- ols (df_south, "our_CHEAT_math")
+```
+
+```{r}
+table3A_ols <-  list(ols3A_1, ols3A_2, ols3A_3)
+msummary(table3A_ols, 
+         coef_omit = -1,
+         coef_rename = c("clsize_new" = "Class size"),
+         gof_map = c("nobs"),
+         )
+```
+
+#table3 PanelB (ols)
+```{r}
+ols3B_1 <- ols (df_raw, "our_CHEAT_ital")
+ols3B_2 <- ols (df_north_center, "our_CHEAT_ital")
+ols3B_3 <- ols (df_south, "our_CHEAT_ital")
+```
+
+```{r}
+table3B_ols <-  list(ols3B_1, ols3B_2, ols3B_3)
+msummary(table3B_ols, 
+         coef_omit = -1,
+         coef_rename = c("clsize_new" = "Class size"),
+         gof_map = c("nobs"),
+         )
+```
+
 
