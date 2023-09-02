@@ -1,7 +1,15 @@
 ---
 title: "RA09"
-output: html_document
 date: "2023-08-29"
+output:
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+    code_folding: hide
+
+
+  
 ---
 
 ```{r setup, include=FALSE}
@@ -9,34 +17,35 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-install.packages("haven")
-install.packages("tidyverse")
-install.packages("gt")
-install.packages("gtsummary")
-install.packages("modelsummary")
-install.packages("estimatr")
+# install.packages("haven")
+# install.packages("tidyverse")
+# install.packages("gt")
+# install.packages("gtsummary")
+# install.packages("modelsummary")
+# install.packages("estimatr")
+# install.packages("kableExtra")
 ```
-```{r}
+```{r,results='hide'}
 library(haven)
 library(tidyverse)
 library(gt)
 library(gtsummary)
 library(estimatr)
 library(modelsummary)
+library(kableExtra)
 ```
 
 
-```{r}
-
+```{r,results='hide'}
 df_raw <- haven::read_dta("smallmo.dta")
 head(df_raw)
 names(df_raw)
 glimpse(df_raw)
 ```
 
-#ここで表作る。
+# table1 記述統計量
 ```{r}
-View(df_raw)
+# View(df_raw)
 ```
 ```{r}
 
@@ -68,22 +77,23 @@ View(df_raw)
 
 make_table <- function(i){
   df_raw |> 
-    mutate(
-      area2 = case_match(south,
-        0 ~ "North/Center",
-        1 ~ "South",
-        .default = NA
-      )
-    ) |> 
+    mutate(area2 = case_match(south,
+                              0 ~ "North/Center",
+                              1 ~ "South",
+                              .default = NA)
+           ) |> 
     filter(grade == i) |> 
-    select (area2, female, immigrants_broad, dad_midedu, mom_employed, answers_math_pct, answers_ital_pct,
+    select (area2, female, immigrants_broad, 
+            dad_midedu, mom_employed, 
+            answers_math_pct, answers_ital_pct,
             clsize_snv, our_CHEAT_math, our_CHEAT_ital) |>
-  filter(!is.na(our_CHEAT_math) & !is.na(our_CHEAT_ital)) |> 
-    tbl_summary(
-      by = area2,
-      statistic = list(all_continuous()~"{mean} ({sd})")
-      ) |> 
-    add_overall() #error
+  filter(!is.na(our_CHEAT_math) &
+           !is.na(our_CHEAT_ital)) |> 
+  tbl_summary(
+    by = area2,
+    statistic = list(all_continuous()~"{mean} ({sd})")
+    ) |> 
+  add_overall()
 }
 ```
 
@@ -101,6 +111,24 @@ tbl_merge(list(table_grade1, table_grade0),
 
 
 ```{r}
+ols_old <- function(data,outcome){
+  result <-
+  data |>
+    rename(y = outcome) |>
+    mutate(clsize_new = clsize_snv/10) |>
+    lm_robust(y ~
+                    clsize_new + students +
+                    students2 +
+                    m_female + female + immigrants_broad +
+                    dad_lowedu + dad_midedu + dad_highedu +
+                    mom_employed + mom_unemp + mom_housew +
+                    enrol_ins_snv*factor(region),
+                  fixed_effects =~ factor(survey) + factor(grade) ,
+                  clusters = clu,
+                  data = _,
+                  se_type = "stata")
+  return(result)
+}
 ols <- function(data,outcome){
   result <-
   data |> 
@@ -112,7 +140,7 @@ ols <- function(data,outcome){
                     m_female + female + immigrants_broad +
                     dad_lowedu + dad_midedu + dad_highedu +
                     mom_employed + mom_unemp + mom_housew +
-                    enrol_ins_snv + factor(region), 
+                    d + enrol_ins_snv*factor(region), 
                   fixed_effects =~ factor(survey) + factor(grade) ,
                   clusters = clu,
                   data = _,
@@ -127,68 +155,294 @@ df_north_center <- df_raw |> filter(south==0)
 df_south <- df_raw |> filter(south==1)
 ```
 
-#table2 PanelA (ols)
+# table2 PanelA (ols)
 ```{r}
+ols2A_1_old <- ols_old (df_raw, "answers_math_std")
+ols2A_2_old <- ols_old (df_north_center, "answers_math_std")
+ols2A_3_old <- ols_old (df_south, "answers_math_std")
 ols2A_1 <- ols (df_raw, "answers_math_std")
 ols2A_2 <- ols (df_north_center, "answers_math_std")
 ols2A_3 <- ols (df_south, "answers_math_std")
 ```
 
-```{r}
-table2A_ols <-  list(ols2A_1, ols2A_2, ols2A_3)
-msummary(table2A_ols, 
-         coef_omit = -1,
-         coef_rename = c("clsize_new" = "Class size"),
-         gof_map = c("nobs"),
-         )
-```
 
-#table2 PanelB (ols)
+# table2 PanelB (ols)
 ```{r}
+ols2B_1_old <- ols_old (df_raw, "answers_ital_std")
+ols2B_2_old <- ols_old(df_north_center, "answers_ital_std")
+ols2B_3_old <- ols_old(df_south, "answers_ital_std")
 ols2B_1 <- ols (df_raw, "answers_ital_std")
 ols2B_2 <- ols (df_north_center, "answers_ital_std")
 ols2B_3 <- ols (df_south, "answers_ital_std")
 ```
 
-```{r}
-table2B_ols <-  list(ols2B_1, ols2B_2, ols2B_3)
-msummary(table2B_ols, 
-         coef_omit = -1,
-         coef_rename = c("clsize_new" = "Class size"),
-         gof_map = c("nobs"),
-         )
-```
 
-#table3 PanelA (ols)
+# table3 PanelA (ols)
 ```{r}
+ols3A_1_old <- ols_old (df_raw, "our_CHEAT_math")
+ols3A_2_old <- ols_old (df_north_center, "our_CHEAT_math")
+ols3A_3_old <- ols_old (df_south, "our_CHEAT_math")
 ols3A_1 <- ols (df_raw, "our_CHEAT_math")
 ols3A_2 <- ols (df_north_center, "our_CHEAT_math")
 ols3A_3 <- ols (df_south, "our_CHEAT_math")
 ```
 
-```{r}
-table3A_ols <-  list(ols3A_1, ols3A_2, ols3A_3)
-msummary(table3A_ols, 
-         coef_omit = -1,
-         coef_rename = c("clsize_new" = "Class size"),
-         gof_map = c("nobs"),
-         )
-```
 
-#table3 PanelB (ols)
+# table3 PanelB (ols)
 ```{r}
+ols3B_1_old <- ols_old (df_raw, "our_CHEAT_ital")
+ols3B_2_old <- ols_old (df_north_center, "our_CHEAT_ital")
+ols3B_3_old <- ols_old (df_south, "our_CHEAT_ital")
 ols3B_1 <- ols (df_raw, "our_CHEAT_ital")
 ols3B_2 <- ols (df_north_center, "our_CHEAT_ital")
 ols3B_3 <- ols (df_south, "our_CHEAT_ital")
 ```
 
 ```{r}
-table3B_ols <-  list(ols3B_1, ols3B_2, ols3B_3)
-msummary(table3B_ols, 
-         coef_omit = -1,
-         coef_rename = c("clsize_new" = "Class size"),
-         gof_map = c("nobs"),
-         )
+iv_old <- function(data,outcome){
+  result <-
+  data |> 
+    rename(y = outcome) |> 
+    mutate(clsize_new = clsize_snv/10) |> 
+    iv_robust(y ~ 
+                    clsize_new + students + 
+                    students2 + 
+                    m_female + female + immigrants_broad +
+                    dad_lowedu + dad_midedu + dad_highedu +
+                    mom_employed + mom_unemp + mom_housew +
+                    enrol_ins_snv*factor(region) | 
+                    clsize_hat + students + students2 + 
+                    m_female + female + immigrants_broad +
+                    dad_lowedu + dad_midedu + dad_highedu +
+                    mom_employed + mom_unemp + mom_housew +
+                    enrol_ins_snv*factor(region), 
+                  fixed_effects =~ factor(survey) + factor(grade) ,
+                  clusters = clu,
+                  data = _,
+                  se_type = "stata")
+  return(result)
+}
+
+iv <- function(data,outcome){
+  result <-
+  data |> 
+    rename(y = outcome) |> 
+    mutate(clsize_new = clsize_snv/10) |> 
+    iv_robust(y ~ 
+                    clsize_new + students + 
+                    students2 + 
+                    m_female + female + immigrants_broad +
+                    dad_lowedu + dad_midedu + dad_highedu +
+                    mom_employed + mom_unemp + mom_housew +
+                    d + enrol_ins_snv*factor(region) | 
+                    clsize_hat + students + students2 + 
+                    m_female + female + immigrants_broad +
+                    dad_lowedu + dad_midedu + dad_highedu +
+                    mom_employed + mom_unemp + mom_housew +
+                    + d + enrol_ins_snv*factor(region), 
+                  fixed_effects =~ factor(survey) + factor(grade) ,
+                  clusters = clu,
+                  data = _,
+                  se_type = "stata")
+  return(result)
+}
+```
+
+
+# IV
+# table2 PanelA (iv)
+```{r}
+iv2A_4_old <- iv_old (df_raw, "answers_math_std")
+iv2A_5_old <- iv_old (df_north_center, "answers_math_std")
+iv2A_6_old <- iv_old (df_south, "answers_math_std")
+iv2A_4 <- iv (df_raw, "answers_math_std")
+iv2A_5 <- iv (df_north_center, "answers_math_std")
+iv2A_6 <- iv (df_south, "answers_math_std")
+```
+
+
+# table2 PanelB (iv)
+```{r}
+iv2B_4_old <- iv_old (df_raw, "answers_ital_std")
+iv2B_5_old <- iv_old (df_north_center, "answers_ital_std")
+iv2B_6_old <- iv_old (df_south, "answers_ital_std")
+iv2B_4 <- iv (df_raw, "answers_ital_std")
+iv2B_5 <- iv (df_north_center, "answers_ital_std")
+iv2B_6 <- iv (df_south, "answers_ital_std")
+```
+
+
+# table3 PanelA (iv)
+```{r}
+iv3A_4_old <- iv_old (df_raw, "our_CHEAT_math")
+iv3A_5_old <- iv_old (df_north_center, "our_CHEAT_math")
+iv3A_6_old <- iv_old (df_south, "our_CHEAT_math")
+iv3A_4 <- iv (df_raw, "our_CHEAT_math")
+iv3A_5 <- iv (df_north_center, "our_CHEAT_math")
+iv3A_6 <- iv (df_south, "our_CHEAT_math")
+```
+
+
+# table3 PanelB (iv)
+```{r}
+iv3B_4_old <- iv_old (df_raw, "our_CHEAT_ital")
+iv3B_5_old <- iv_old (df_north_center, "our_CHEAT_ital")
+iv3B_6_old <- iv_old (df_south, "our_CHEAT_ital")
+iv3B_4 <- iv (df_raw, "our_CHEAT_ital")
+iv3B_5 <- iv (df_north_center, "our_CHEAT_ital")
+iv3B_6 <- iv (df_south, "our_CHEAT_ital")
+```
+
+
+## Merge OLS and IV on Table 2
+```{r}
+List_table2A <- list(ols2A_1, ols2A_2, ols2A_3, iv2A_4, iv2A_5, iv2A_6)
+msummary(List_table2A, 
+         coef_map = c("clsize_new" = "class size"),
+         gof_map=("nobs")) |> 
+  add_header_above(c("","Italy","North/Center","South",
+                     "Italy","North/Center","South"),line = FALSE) |> 
+  add_header_above(c("","OLS"=3,"IV"=3))
+
+List_table2B <- list(ols2B_1, ols2B_2, ols2B_3, iv2B_4, iv2B_5, iv2B_6)
+msummary(List_table2B, 
+         coef_map = c("clsize_new" = "class size"),
+         gof_map=("nobs")) |> 
+  add_header_above(c("","Italy","North/Center","South",
+                     "Italy","North/Center","South"),line = FALSE) |> 
+  add_header_above(c("","OLS"=3,"IV"=3))
+
+```
+### Old version of Table 2 Merge OLS and IV
+```{r}
+List_table2A_old <- list(ols2A_1_old, ols2A_2_old, ols2A_3_old, iv2A_4_old, iv2A_5_old, iv2A_6_old)
+msummary(List_table2A_old, 
+         coef_map = c("clsize_new" = "class size"),
+         gof_map=("nobs")) |> 
+  add_header_above(c("","Italy","North/Center","South",
+                     "Italy","North/Center","South"),line = FALSE) |> 
+  add_header_above(c("","OLS"=3,"IV"=3))
+
+List_table2B_old <- list(ols2B_1_old, ols2B_2_old, ols2B_3_old, iv2B_4_old, iv2B_5_old, iv2B_6_old)
+msummary(List_table2B_old,
+         coef_map = c("clsize_new" = "class size"),
+         gof_map=("nobs")) |> 
+  add_header_above(c("","Italy","North/Center","South",
+                     "Italy","North/Center","South"),line = FALSE) |> 
+  add_header_above(c("","OLS"=3,"IV"=3))
+
+```
+## Merge OLS and IV on Table 3
+```{r}
+List_table3A <- list(ols3A_1, ols3A_2, ols3A_3, iv3A_4, iv3A_5, iv3A_6)
+msummary(List_table3A, 
+         coef_map = c("clsize_new" = "class size"),
+         gof_map=("nobs")) |> 
+  add_header_above(c("","Italy","North/Center","South",
+                     "Italy","North/Center","South"),line = FALSE) |> 
+  add_header_above(c("","OLS"=3,"IV"=3))
+
+List_table3B <- list(ols3B_1, ols3B_2, ols3B_3, iv3B_4, iv3B_5, iv3B_6)
+msummary(List_table3B, 
+         coef_map = c("clsize_new" = "class size"),
+         gof_map=("nobs")) |> 
+  add_header_above(c("","Italy","North/Center","South",
+                     "Italy","North/Center","South"),line = FALSE) |> 
+  add_header_above(c("","OLS"=3,"IV"=3))
+
+```
+### Old version of Table 3 Merge OLS and IV
+```{r}
+List_table3A_old <- list(ols3A_1_old, ols3A_2_old, ols3A_3_old, iv3A_4_old, iv3A_5_old, iv3A_6_old)
+msummary(List_table3A_old, 
+         coef_map = c("clsize_new" = "class size"),
+         gof_map=("nobs")) |> 
+  add_header_above(c("","Italy","North/Center","South",
+                     "Italy","North/Center","South"),line = FALSE) |> 
+  add_header_above(c("","OLS"=3,"IV"=3))
+
+List_table3B_old <- list(ols3B_1_old, ols3B_2_old, ols3B_3_old, iv3B_4_old, iv3B_5_old, iv3B_6_old)
+msummary(List_table3B_old, 
+         coef_map = c("clsize_new" = "class size"),
+         gof_map=("nobs")) |> 
+  add_header_above(c("","Italy","North/Center","South",
+                     "Italy","North/Center","South"),line = FALSE) |> 
+  add_header_above(c("","OLS"=3,"IV"=3))
+
+```
+
+# First Stage Regressions for Table7
+
+```{r}
+#第1段階 : 説明変数 (Manipulation, Class_size) ~ 操作変数
+#第2段階 : 被説明変数 (test_score) ~ 説明変数
+
+first_stage_ols <- function(data, predictor){
+  result <-
+  data |> 
+    rename(y = predictor) |> 
+    lm_robust(y ~ 
+                    clsize_hat + o_math + 
+                    m_female + female + immigrants_broad +
+                    dad_lowedu + dad_midedu + dad_highedu +
+                    mom_employed + mom_unemp + mom_housew +
+                    enrol_ins_snv * factor(region) + factor(segment)*students + factor(segment)*students2 + d,
+                  fixed_effects =~ factor(survey) + factor(grade) ,
+                  clusters = clu,
+                  data = _,
+                  se_type = "stata")
+  return(result)
+}
+```
+
+```{r}
+# Math PanelB
+ list_1st_ols_size <- list(first_stage_ols(df_raw, "clsize_snv"),
+ first_stage_ols(df_north_center, "clsize_snv"),
+ first_stage_ols(df_south, "clsize_snv"))
+ msummary(list_1st_ols_size, 
+         coef_map = c("clsize_hat" = "Maimonides' Rule", 
+                      "o_math" = "Monitor at institution"),
+         gof_map=("nobs")) |> 
+  add_header_above(c("","Italy","North/Center","South"),line = FALSE) |> 
+  add_header_above(c("","Math"=3))
+
+```
+
+```{r}
+# PanelA
+list_A <- 
+  list(first_stage_ols(df_raw, "our_CHEAT_math"),
+       first_stage_ols(df_north_center, "our_CHEAT_math"),
+       first_stage_ols(df_south, "our_CHEAT_math"),
+       first_stage_ols(df_raw, "our_CHEAT_ital"),
+       first_stage_ols(df_north_center, "our_CHEAT_ital"),
+       first_stage_ols(df_south, "our_CHEAT_ital"))
+
+ msummary(list_A, 
+         coef_map = c("clsize_hat" = "Maimonides' Rule", 
+                      "o_math" = "Monitor at institution"),
+         gof_map=("nobs"))|> 
+  add_header_above(c("","Italy","North/Center","South",
+                     "Italy","North/Center","South"),
+                   line = FALSE) |> 
+  add_header_above(c("","Math"=3,"Language"=3))
+```
+
+```{r}
+
+# PanelB
+ list_1st_ols_size <- 
+  list(first_stage_ols(df_raw, "clsize_snv"),
+       first_stage_ols(df_north_center, "clsize_snv"),
+       first_stage_ols(df_south, "clsize_snv"))
+ msummary(list_1st_ols_size, 
+         coef_map = c("clsize_hat" = "Maimonides' Rule", 
+                      "o_math" = "Monitor at institution"),
+         gof_map=("nobs")) |> 
+  add_header_above(c("","Italy","North/Center","South"),line = FALSE) |> 
+  add_header_above(c("","Math"=3))
+
 ```
 
 
